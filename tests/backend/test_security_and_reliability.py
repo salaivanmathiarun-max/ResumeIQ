@@ -454,3 +454,59 @@ def test_cors_preflight_and_configured_origins(client):
     assert get_response.status_code == 200
     assert get_response.headers.get("access-control-allow-origin") == "http://127.0.0.1:5173"
 
+    # Production Vercel origin preflight OPTIONS request
+    prod_options = client.options(
+        "/api/health",
+        headers={
+            "Origin": "https://resume-iq-olive-theta.vercel.app",
+            "Access-Control-Request-Method": "GET",
+        },
+    )
+    assert prod_options.status_code == 200
+    assert prod_options.headers.get("access-control-allow-origin") == "https://resume-iq-olive-theta.vercel.app"
+
+    # Production Vercel origin standard GET request
+    prod_get = client.get(
+        "/api/health",
+        headers={"Origin": "https://resume-iq-olive-theta.vercel.app"},
+    )
+    assert prod_get.status_code == 200
+    assert prod_get.headers.get("access-control-allow-origin") == "https://resume-iq-olive-theta.vercel.app"
+
+
+def test_cors_origins_normalization():
+    """
+    Verify that parse_cors_origins handles defaults, comma-separation,
+    whitespace trimming, quote stripping, and trailing slash removal.
+    """
+    from app.core.config import DEFAULT_CORS_ORIGINS, parse_cors_origins
+
+    # 1. Production origin in defaults alongside localhost
+    assert "https://resume-iq-olive-theta.vercel.app" in DEFAULT_CORS_ORIGINS
+    assert "http://localhost:5173" in DEFAULT_CORS_ORIGINS
+    assert "http://127.0.0.1:5173" in DEFAULT_CORS_ORIGINS
+
+    # 2. None or empty string returns defaults
+    assert parse_cors_origins(None) == DEFAULT_CORS_ORIGINS
+    assert parse_cors_origins("") == DEFAULT_CORS_ORIGINS
+    assert parse_cors_origins("   ") == DEFAULT_CORS_ORIGINS
+
+    # 3. Comma-separated environment origins
+    parsed = parse_cors_origins("https://preview.vercel.app,https://custom-domain.com")
+    assert parsed == ["https://preview.vercel.app", "https://custom-domain.com"]
+
+    # 4. Whitespace and surrounding single/double quote normalization
+    quoted = parse_cors_origins('"https://preview.vercel.app", \'https://custom-domain.com\'')
+    assert quoted == ["https://preview.vercel.app", "https://custom-domain.com"]
+
+    whole_quoted = parse_cors_origins('"https://preview.vercel.app,http://localhost:5173"')
+    assert whole_quoted == ["https://preview.vercel.app", "http://localhost:5173"]
+
+    # 5. Trailing slash normalization
+    slashes = parse_cors_origins("https://resume-iq-olive-theta.vercel.app/,http://localhost:5173///")
+    assert slashes == ["https://resume-iq-olive-theta.vercel.app", "http://localhost:5173"]
+
+    # 6. Combined edge case with spaces, quotes, and slashes
+    combined = parse_cors_origins(' "https://resume-iq-olive-theta.vercel.app/" , \'http://localhost:5173/\' ')
+    assert combined == ["https://resume-iq-olive-theta.vercel.app", "http://localhost:5173"]
+

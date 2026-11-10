@@ -20,9 +20,20 @@ ALLOWED_FILE_EXTENSIONS = {".pdf", ".docx"}
 DEFAULT_CORS_ORIGINS = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
+    "https://resume-iq-olive-theta.vercel.app",
 ]
-raw_cors = os.getenv("CORS_ORIGINS")
-if raw_cors:
-    CORS_ORIGINS = [origin.strip() for origin in raw_cors.split(",") if origin.strip()]
-else:
-    CORS_ORIGINS = DEFAULT_CORS_ORIGINS
+
+
+def parse_cors_origins(raw: str | None) -> list[str]:
+    """Parse and normalize CORS_ORIGINS from raw string, stripping whitespace, quotes, and trailing slashes."""
+    if not raw:
+        return list(DEFAULT_CORS_ORIGINS)
+    parsed = []
+    for origin in raw.split(","):
+        cleaned = origin.strip().strip("'\"").rstrip("/")
+        if cleaned:
+            parsed.append(cleaned)
+    return parsed if parsed else list(DEFAULT_CORS_ORIGINS)
+
+
+CORS_ORIGINS = parse_cors_origins(os.getenv("CORS_ORIGINS"))
